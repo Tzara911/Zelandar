@@ -8,3 +8,12 @@ dist/
 build/
 *.spec
 *.db
+dist/
+build/
+*.pkg
+*.app
+*.exe
+*.dmg
+*.zip
+*.tar.gz
+*.sqlite
