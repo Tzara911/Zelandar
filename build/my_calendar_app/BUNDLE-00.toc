@@ -1,0 +1,3 @@
+([('my_calendar_app',
+   '/Users/zhaoyang/Desktop/personal project/dist/my_calendar_app',
+   'EXECUTABLE')],)
