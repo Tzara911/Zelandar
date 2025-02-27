@@ -3,3 +3,8 @@ dist/
 build/
 *.spec
 *.db
+.DS_Store
+dist/
+build/
+*.spec
+*.db
