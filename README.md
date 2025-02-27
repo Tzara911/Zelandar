@@ -1,4 +1,7 @@
 # Zelandar
+🚧 **Status: In Progress** 🚧  
+This project is actively being developed. Features and functionality may change.
+
 
 A Qt, SQL, and PaddleOCR-based application with AI-driven functionality.
 
