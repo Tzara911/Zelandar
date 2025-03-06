@@ -18,14 +18,7 @@ from watchdog.events import FileSystemEventHandler
 from PyQt6.QtGui import QDragEnterEvent, QDropEvent, QPainter, QBrush, QColor
 from PyQt6.QtWidgets import QStyle
 
-# Dependencies: pip install PyQt6 gradio_client watchdog python-dateutil
 
-# SQL/Users/zhaoyang/PycharmProjects/PythonProject/.venv/bin/python /Users/zhaoyang/PycharmProjects/PythonProject/.venv/lib/Zelandar.py
-# Traceback (most recent call last):
-#   File "/Users/zhaoyang/PycharmProjects/PythonProject/.venv/lib/Zelandar.py", line 17, in <module>
-#     from PyQt6.QtGui import QDragEnterEvent, QDropEvent, QPainter, QStyleOptionViewItem, QBrush, QColor
-# ImportError: cannot import name 'QStyleOptionViewItem' from 'PyQt6.QtGui' (/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/PyQt6/QtGui.abi3.so)
-#
 # Process finished with exit code 1ite database initialization
 conn = sqlite3.connect('identifier.sqlite')
 cursor = conn.cursor()
@@ -126,30 +119,31 @@ class CustomCalendarWidget(QCalendarWidget):
             painter.setBrush(QBrush(QColor(255, 215, 0, 100)))  # Light gold for events
             painter.drawRect(rect.adjusted(1, 1, -1, -1))
             painter.restore()
-            painter.setPen(QColor(0,0,0))  # ✅ 白色字体
+            painter.setPen(QColor(0,0,0))  # 
             font = painter.font()
-            font_size = max(6, rect.height() // (len(events) + 2))  # 让文字大小适应格子
+            dynamic_font_size = max(6, rect.height() // (len(events) + 2))  # fit the grid
+            font_size = dynamic_font_size
             font.setPointSize(font_size)
             painter.setFont(font)
 
-            # 📅 显示最多 2 条事件
-            y_offset = rect.top() + dynamic_font_size  # 根据字体大小调整初始偏移
-            max_events = min(len(events), 2)  # 只显示最多 2 条事件
-            line_spacing = max(12, dynamic_font_size + 2)  # 根据字体大小动态调整行距
+            # status bar display
+            y_offset = rect.top() + dynamic_font_size  
+            max_events = max(len(events), 2)  
+            line_spacing = max(12, dynamic_font_size + 2)  
             for i in range(max_events):
                 event = events[i]
                 title = event.get("title", "Event")
                 start_time = event.get("start_time", "").split(" ")[1] if event.get("start_time") else "?"
                 location = event.get("location", "Unknown")
 
-                event_text = f"{start_time} {title} ({location})"  # 显示时间+标题
+                event_text = f"{start_time} {title} ({location})"  # show time and title
                 #display in grid
                 painter.drawText(rect.left() + 2, y_offset, rect.width()-4, rect.height(),
                  Qt.AlignmentFlag.AlignLeft, event_text)
 
                 y_offset += font.pointSize()+2
     def update_events(self, events):
-        # Update events_by_date with new events
+        
         # Update events_by_date with new events, handling multiple time formats
         self.events_by_date.clear()
         for event in events:
@@ -371,100 +365,64 @@ class CalendarApp(QMainWindow):
         except Exception as e:
             print(f"Prediction failed: {str(e)}")
             return None
-
+    client = Client("Zoe911/spaCy-C")
     def parse_appointment(self, text):
-        # Parse OCR text to extract calendar events, supporting recurring patterns
+      #Process OCR-extracted text and use the spaCy-C model to extract structured event information.
         appointment_infos = []
         lines = text.split('\n')
         recurring_events = {}
-        location = "Classroom TBD"  # Default location if not specified
+        location = None  # Default location if not specified
+        event_name = "Untitled Event" #default
+        duration = "Unknow" #default
+        start_time = None
+        end_time = None
+       
+       #send OCR text to spaCy-C API
+        try:   
+            ner_response = self.client.predict(
+                text = text,
+                api_name="/predict"
+            )
+        except Exception as e:
+            print(f"Error calling spaCy-C API: {e}")
+            return []    
+        # Parse API response (assuming the response is a list of dictionaries)
+        entities = {ent["entity"]: ent["word"] for ent in ner_response}
+          
+        # extract recognized entities
+        event_name = entities.get("EVENT", event_name)
+        location = entities.get("GPE", location)
+        start_time = entities.get("TIME", None)
+        end_time = None  
+        # convert start time to 24hour format 
+        if start_time:
+            try:
+                start_time_obj = datetime.strptime(start_time, "%I:%M %p") if "AM" in start_time or "PM" in start_time else datetime.strptime(start_time, "%H:%M")
+                start_time = start_time_obj.strftime("%H:%M")
+            except Exception as e:
+                print(f"Error parsing star time: {e}")
+                start_time = "Unknown"
 
-        # Parse each line to identify events, dates, and times
-        for line in lines:
-            line = line.strip()
-            if not line:
-                continue
-
-            # Match course codes and times (e.g., IT386 9:35 AM)
-            match = re.search(r"([A-Z]+\d+)\s*(\d{1,2}:\d{2}\s*(?:AM|PM))", line, re.IGNORECASE)
-            if match:
-                course_code = match.group(1)
-                time_str = match.group(2)
-                # Parse time
-                try:
-                    time_obj = datetime.strptime(time_str, "%I:%M %p")
-                    hour = time_obj.hour
-                    minute = time_obj.minute
-                    # Default to 50-minute duration for simplicity (adjust if needed)
-                    end_hour = hour + 1 if minute == 0 else hour
-                    end_minute = 0 if minute == 0 else 50
-                    if end_hour > 12:
-                        end_hour -= 12
-                        if end_hour == 0:
-                            end_hour = 12
-                    end_time_str = f"{end_hour}:{end_minute:02d} {'PM' if end_hour > 12 else 'AM'}"
-                    recurring_events[course_code] = {
-                        "start_time": time_str,
-                        "end_time": end_time_str,
-                        "title": course_code
-                    }
-                except ValueError:
-                    print(f"Could not parse time for {course_code}: {time_str}")
-                    continue
-
-            # Match location if present (assuming it's in the text)
-            location_match = re.search(r"(?:location|room)[ :]\s*(.+)", line, re.IGNORECASE)
-            if location_match:
-                location = location_match.group(1)
-
-            # Match date (e.g., "17 Presidents' Day")
-            date_match = re.search(r"(\d{1,2})\s*(?:\w+)?", line)
-            if date_match:
-                day = int(date_match.group(1))
-                # Assume February 2025 for this example
-                for year, month in [(2025, 2)]:  # Extend this for other months if needed
-                    try:
-                        date = datetime(year, month, day)
-                        for course_code, event in recurring_events.items():
-                            # Generate events for specific weekdays based on the screenshot pattern
-                            if course_code in ["IT386", "IT279", "IT261", "IT191"]:  # Monday and Wednesday
-                                weekdays = [MO, WE]
-                            elif course_code == "IT244":  # Tuesday
-                                weekdays = [TU]
-                            else:
-                                continue
-
-                            start_time = datetime.strptime(event["start_time"], "%I:%M %p")
-                            end_time = datetime.strptime(event["end_time"], "%I:%M %p")
-                            start_dt = date.replace(hour=start_time.hour, minute=start_time.minute)
-                            end_dt = date.replace(hour=end_time.hour, minute=end_time.minute)
-
-                            appointment_infos.append({
-                                "title": event["title"],
-                                "start_time": start_dt.strftime("%Y-%m-%d %H:%M"),
-                                "end_time": end_dt.strftime("%Y-%m-%d %H:%M"),
-                                "location": location,
-                                "description": f"Recurring {course_code} class"
-                            })
-                    except ValueError:
-                        print(f"Invalid date for day {day} in {month}/{year}")
-                        continue
-
-        # If no recurring pattern detected, try single events (optional fallback)
-        if not appointment_infos:
-            # Default single event (keep this for backward compatibility if needed)
-            single_event = {
-                "title": "Untitled Event",
-                "start_time": None,
-                "end_time": None,
-                "location": location,
-                "description": text
+          # Generate status bar message
+        status_bar_text = f"{event_name} | {location} | Duration: {duration}"
+        print(f"DEBUG - status_bar_text: {status_bar_text}")
+        
+             
+             # Create structured event output
+        appointment_info = {
+            "title": event_name,
+            "start_time": start_time or "Unknown",
+            "end_time": end_time or "Unknown",
+            "duration": duration,
+            "location": location,
+            "description": text
             }
-            appointment_infos.append(single_event)
-            title_match = re.search(r"Title:[ :]\s*(.+)", text, re.IGNORECASE)
-            if title_match:
-                single_event["title"] = title_match.group(1)
+
+        appointment_infos.append(appointment_info)
+
         return appointment_infos
+            
+
 
     def add_event_to_calendar(self, appointment_info):
         # Add event to database and update calendar
