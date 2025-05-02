@@ -1,3 +1,0 @@
-([('CalendarApp',
-   '/Users/zhaoyang/Desktop/personal project/dist/CalendarApp',
-   'EXECUTABLE')],)
