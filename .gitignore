@@ -1,20 +1,23 @@
+# macOS
 .DS_Store
-dist/
+
+# Build artifacts
 build/
+dist/
+
+# PyInstaller / packaging
 *.spec
-*.db
-.DS_Store
-dist/
-build/
-*.spec
-*.db
-dist/
-build/
 *.pkg
 *.app
-*.exe
-*.dmg
+
+# Database files
+*.db
+*.sqlite
+
+# Archives
 *.zip
 *.tar.gz
-*.sqlite
-build/
+*.dmg
+
+# Windows executables
+*.exe
